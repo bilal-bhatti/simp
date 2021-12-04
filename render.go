@@ -29,7 +29,6 @@ func Success(w http.ResponseWriter, data interface{}) {
 
 type errorResponse struct {
 	Code    int         `json:"code"`
-	Status  string      `json:"status"`
 	Message string      `json:"message,omitempty"`
 	Body    interface{} `json:"body,omitempty"`
 }

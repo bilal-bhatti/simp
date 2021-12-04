@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	_ error = &appError{}
+	_ error = &AppError{}
 )
 
 type StackTracer interface {
@@ -19,27 +19,27 @@ type ResponseHolder interface {
 	Body() interface{}
 }
 
-type appError struct {
+type AppError struct {
 	err  error
 	code int
 	body interface{}
 }
 
-func New(msg string) ResponseHolder {
-	return &appError{
+func New(msg string) *AppError {
+	return &AppError{
 		err:  errors.New(msg),
 		code: http.StatusInternalServerError,
 	}
 }
 
-func Wrap(err error, msg string) ResponseHolder {
-	return &appError{
+func Wrap(err error, msg string) *AppError {
+	return &AppError{
 		err:  errors.Wrap(err, msg),
 		code: http.StatusInternalServerError,
 	}
 }
 
-func (e *appError) StackTrace() errors.StackTrace {
+func (e *AppError) StackTrace() errors.StackTrace {
 	if err, ok := e.err.(StackTracer); ok {
 		return err.StackTrace()
 	}
@@ -48,24 +48,24 @@ func (e *appError) StackTrace() errors.StackTrace {
 	return []errors.Frame{}
 }
 
-func (e *appError) StatusCode() int {
+func (e *AppError) StatusCode() int {
 	return e.code
 }
 
-func (e *appError) Body() interface{} {
+func (e *AppError) Body() interface{} {
 	return e.body
 }
 
-func (e *appError) Error() string {
+func (e *AppError) Error() string {
 	return e.err.Error()
 }
 
-func (e *appError) WithStatusCode(code int) ResponseHolder {
+func (e *AppError) WithStatusCode(code int) *AppError {
 	e.code = code
 	return e
 }
 
-func (e *appError) WithBody(body interface{}) ResponseHolder {
+func (e *AppError) WithBody(body interface{}) *AppError {
 	e.body = body
 	return e
 }

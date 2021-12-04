@@ -1,4 +1,4 @@
-# simp
+# skit
 
 Found myself writing the same error and responder functions, so this ...
 

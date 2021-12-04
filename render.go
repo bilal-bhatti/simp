@@ -1,4 +1,4 @@
-package simp
+package skit
 
 import (
 	"bytes"

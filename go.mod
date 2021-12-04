@@ -1,4 +1,4 @@
-module github.com/bilal-bhatti/simp
+module github.com/bilal-bhatti/skit
 
 go 1.17
 

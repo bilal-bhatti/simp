@@ -1,71 +1,119 @@
 package skit
 
 import (
-	"net/http"
+	"fmt"
+	"io"
 
 	"github.com/pkg/errors"
 )
 
 var (
-	_ error = &AppError{}
+	_ error        = &wrap{}
+	_ StackTracer  = &wrap{}
+	_ error        = &status{}
+	_ StatusHolder = &status{}
 )
 
 type StackTracer interface {
 	StackTrace() errors.StackTrace
 }
 
-type ResponseHolder interface {
-	StatusCode() int
-	Body() interface{}
+type StatusHolder interface {
+	Status() (int, interface{})
 }
 
-type AppError struct {
+type wrap struct {
+	err error
+}
+
+func New(msg string) error {
+	return &wrap{
+		err: errors.New(msg),
+	}
+}
+
+func Newf(msg string, args ...interface{}) error {
+	return &wrap{
+		err: errors.Errorf(msg, args...),
+	}
+}
+
+func Wrap(err error, msg string) error {
+	return &wrap{
+		err: errors.Wrap(err, msg),
+	}
+}
+
+func Wrapf(err error, msg string, args ...interface{}) error {
+	return &wrap{
+		err: errors.Wrapf(err, msg, args...),
+	}
+}
+
+func (e *wrap) StackTrace() errors.StackTrace {
+	if err, ok := e.err.(StackTracer); ok {
+		return err.StackTrace()
+	}
+
+	return []errors.Frame{}
+}
+
+func (e *wrap) Error() string {
+	return e.err.Error()
+}
+
+func (e *wrap) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		e.StackTrace().Format(s, verb)
+	case 's':
+		io.WriteString(s, e.Error())
+	}
+}
+
+func (e *wrap) Unwrap() error {
+	return e.err
+}
+
+type status struct {
 	err  error
 	code int
 	body interface{}
 }
 
-func New(msg string) *AppError {
-	return &AppError{
-		err:  errors.New(msg),
-		code: http.StatusInternalServerError,
-	}
-}
-
-func Wrap(err error, msg string) *AppError {
-	return &AppError{
-		err:  errors.Wrap(err, msg),
-		code: http.StatusInternalServerError,
-	}
-}
-
-func (e *AppError) StackTrace() errors.StackTrace {
-	if err, ok := e.err.(StackTracer); ok {
-		return err.StackTrace()
-	}
-
-	// use runtime to build the frames, maybe?
-	return []errors.Frame{}
-}
-
-func (e *AppError) StatusCode() int {
-	return e.code
-}
-
-func (e *AppError) Body() interface{} {
-	return e.body
-}
-
-func (e *AppError) Error() string {
+func (e *status) Error() string {
 	return e.err.Error()
 }
 
-func (e *AppError) WithStatusCode(code int) *AppError {
-	e.code = code
-	return e
+func (e *status) Status() (int, interface{}) {
+	return e.code, e.body
 }
 
-func (e *AppError) WithBody(body interface{}) *AppError {
-	e.body = body
-	return e
+func (e *status) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if t, ok := e.err.(StackTracer); ok {
+			t.StackTrace().Format(s, verb)
+		} else {
+			if s.Flag('+') {
+				fmt.Fprintf(s, "%+v", t)
+			} else {
+				fmt.Fprintf(s, "%v", t)
+			}
+		}
+	case 's':
+		io.WriteString(s, e.Error())
+	}
+}
+
+func (e *status) Unwrap() error {
+	return e.err
+}
+
+func WithStatus(err error, code int, body interface{}) error {
+	return &status{
+		err:  errors.WithStack(err),
+		code: code,
+		body: body,
+	}
 }

@@ -43,11 +43,8 @@ func Error(w http.ResponseWriter, err error) {
 		Message: err.Error(),
 	}
 
-	if holder, ok := err.(ResponseHolder); ok {
-		resp.Code = holder.StatusCode()
-		if holder.Body() != nil {
-			resp.Body = holder.Body()
-		}
+	if holder, ok := err.(StatusHolder); ok {
+		resp.Code, resp.Body = holder.Status()
 	}
 
 	buf := &bytes.Buffer{}
@@ -87,6 +84,8 @@ func logError(skip int, msg string, err error) {
 
 	if err, ok := err.(StackTracer); ok {
 		st := err.StackTrace()[skip:]
+		log.Printf("%+v", st)
+		log.Println("-----")
 		for _, frame := range st {
 			log.Printf("%+s:%d", frame, frame)
 		}

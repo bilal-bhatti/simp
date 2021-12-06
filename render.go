@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"runtime"
 )
 
 func Success(w http.ResponseWriter, data interface{}) {
@@ -43,8 +42,9 @@ func Error(w http.ResponseWriter, err error) {
 		Message: err.Error(),
 	}
 
-	if holder, ok := err.(StatusHolder); ok {
-		resp.Code, resp.Body = holder.Status()
+	if ok, c, b := Status(err); ok {
+		resp.Code = c
+		resp.Body = b
 	}
 
 	buf := &bytes.Buffer{}
@@ -75,19 +75,5 @@ func logError(skip int, msg string, err error) {
 		return
 	}
 
-	// skip callers
-	pc, _, line, _ := runtime.Caller(skip)
-
-	log.Printf("calling function: %s\n", runtime.FuncForPC(pc).Name())
-	log.Printf("line: %d\n", line)
-	log.Println("stacktrace:")
-
-	if err, ok := err.(StackTracer); ok {
-		st := err.StackTrace()[skip:]
-		log.Printf("%+v", st)
-		log.Println("-----")
-		for _, frame := range st {
-			log.Printf("%+s:%d", frame, frame)
-		}
-	}
+	log.Printf("%+v", err)
 }

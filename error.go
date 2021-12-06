@@ -3,76 +3,23 @@ package skit
 import (
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/pkg/errors"
 )
 
 var (
-	_ error        = &wrap{}
-	_ StackTracer  = &wrap{}
-	_ error        = &status{}
-	_ StatusHolder = &status{}
+	_ holder = &status{}
 )
 
-type StackTracer interface {
+type tracer interface {
+	error
 	StackTrace() errors.StackTrace
 }
 
-type StatusHolder interface {
-	Status() (int, interface{})
-}
-
-type wrap struct {
-	err error
-}
-
-func New(msg string) error {
-	return &wrap{
-		err: errors.New(msg),
-	}
-}
-
-func Newf(msg string, args ...interface{}) error {
-	return &wrap{
-		err: errors.Errorf(msg, args...),
-	}
-}
-
-func Wrap(err error, msg string) error {
-	return &wrap{
-		err: errors.Wrap(err, msg),
-	}
-}
-
-func Wrapf(err error, msg string, args ...interface{}) error {
-	return &wrap{
-		err: errors.Wrapf(err, msg, args...),
-	}
-}
-
-func (e *wrap) StackTrace() errors.StackTrace {
-	if err, ok := e.err.(StackTracer); ok {
-		return err.StackTrace()
-	}
-
-	return []errors.Frame{}
-}
-
-func (e *wrap) Error() string {
-	return e.err.Error()
-}
-
-func (e *wrap) Format(s fmt.State, verb rune) {
-	switch verb {
-	case 'v':
-		e.StackTrace().Format(s, verb)
-	case 's':
-		io.WriteString(s, e.Error())
-	}
-}
-
-func (e *wrap) Unwrap() error {
-	return e.err
+type holder interface {
+	error
+	status() (int, interface{})
 }
 
 type status struct {
@@ -85,24 +32,27 @@ func (e *status) Error() string {
 	return e.err.Error()
 }
 
-func (e *status) Status() (int, interface{}) {
+func (e *status) status() (int, interface{}) {
 	return e.code, e.body
+}
+
+func (e *status) StackTrace() errors.StackTrace {
+	if err, ok := e.err.(tracer); ok {
+		return err.StackTrace()
+	}
+
+	return []errors.Frame{}
 }
 
 func (e *status) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
-		if t, ok := e.err.(StackTracer); ok {
-			t.StackTrace().Format(s, verb)
-		} else {
-			if s.Flag('+') {
-				fmt.Fprintf(s, "%+v", t)
-			} else {
-				fmt.Fprintf(s, "%v", t)
-			}
-		}
+		io.WriteString(s, e.Error())
+		e.StackTrace()[1:].Format(s, verb)
 	case 's':
 		io.WriteString(s, e.Error())
+	case 'q':
+		fmt.Fprintf(s, "%q", e.Error())
 	}
 }
 
@@ -112,8 +62,17 @@ func (e *status) Unwrap() error {
 
 func WithStatus(err error, code int, body interface{}) error {
 	return &status{
-		err:  errors.WithStack(err),
+		err:  errors.Errorf("%s - %+v", http.StatusText(code), err),
 		code: code,
 		body: body,
 	}
+}
+
+func Status(err error) (bool, int, interface{}) {
+	var sh holder
+	if errors.As(err, &sh) {
+		code, body := sh.status()
+		return true, code, body
+	}
+	return false, 0, nil
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/pkg/errors"
 )
 
 func Success(w http.ResponseWriter, data interface{}) {
@@ -14,7 +16,7 @@ func Success(w http.ResponseWriter, data interface{}) {
 
 	if err := enc.Encode(data); err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		logError(0, "failed to encode JSON", err)
+		logError(0, "", errors.Errorf("failed to encode data: %+v", err))
 		return
 	}
 
@@ -22,7 +24,7 @@ func Success(w http.ResponseWriter, data interface{}) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write(buf.Bytes())
 	if err != nil {
-		logError(0, "failed to write http response", err)
+		logError(0, "", errors.Errorf("failed to write http response: %+v", err))
 	}
 }
 
@@ -53,7 +55,7 @@ func Error(w http.ResponseWriter, err error) {
 
 	if err := enc.Encode(resp); err != nil {
 		http.Error(w, http.StatusText(resp.Code), resp.Code)
-		logError(0, "failed to encode error response to JSON", err)
+		logError(0, "", errors.Errorf("failed to encode data: %+v", err))
 		return
 	}
 
@@ -61,7 +63,7 @@ func Error(w http.ResponseWriter, err error) {
 	w.WriteHeader(resp.Code)
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
-		logError(0, "failed to write error response", err)
+		logError(0, "", errors.Errorf("failed to write http response: %+v", err))
 		return
 	}
 }

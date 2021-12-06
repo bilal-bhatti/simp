@@ -16,7 +16,7 @@ func Success(w http.ResponseWriter, data interface{}) {
 
 	if err := enc.Encode(data); err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		logError(0, "", errors.Errorf("failed to encode data: %+v", err))
+		logError("", errors.Errorf("failed to encode data: %+v", err))
 		return
 	}
 
@@ -24,29 +24,27 @@ func Success(w http.ResponseWriter, data interface{}) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write(buf.Bytes())
 	if err != nil {
-		logError(0, "", errors.Errorf("failed to write http response: %+v", err))
+		logError("", errors.Errorf("failed to write http response: %+v", err))
 	}
 }
 
 type errorResponse struct {
 	Code    int         `json:"code"`
-	Message string      `json:"message,omitempty"`
-	Body    interface{} `json:"body,omitempty"`
+	Error   string      `json:"error,omitempty"`
+	Details interface{} `json:"details,omitempty"`
 }
 
-func Error(w http.ResponseWriter, err error) {
-	defer func() {
-		logError(2, "", err)
-	}()
+func Failure(w http.ResponseWriter, err error) {
+	logError("failure response", err)
 
 	resp := &errorResponse{
-		Code:    http.StatusInternalServerError,
-		Message: err.Error(),
+		Code:  http.StatusInternalServerError,
+		Error: err.Error(),
 	}
 
 	if ok, c, b := Status(err); ok {
 		resp.Code = c
-		resp.Body = b
+		resp.Details = b
 	}
 
 	buf := &bytes.Buffer{}
@@ -55,7 +53,7 @@ func Error(w http.ResponseWriter, err error) {
 
 	if err := enc.Encode(resp); err != nil {
 		http.Error(w, http.StatusText(resp.Code), resp.Code)
-		logError(0, "", errors.Errorf("failed to encode data: %+v", err))
+		logError("", errors.Errorf("failed to encode data: %+v", err))
 		return
 	}
 
@@ -63,12 +61,12 @@ func Error(w http.ResponseWriter, err error) {
 	w.WriteHeader(resp.Code)
 	_, err = w.Write(buf.Bytes())
 	if err != nil {
-		logError(0, "", errors.Errorf("failed to write http response: %+v", err))
+		logError("", errors.Errorf("failed to write http response: %+v", err))
 		return
 	}
 }
 
-func logError(skip int, msg string, err error) {
+func logError(msg string, err error) {
 	if msg != "" {
 		log.Println(msg)
 	}
@@ -77,5 +75,5 @@ func logError(skip int, msg string, err error) {
 		return
 	}
 
-	log.Printf("%+v", err)
+	log.Printf("stacktrace: %+v", err)
 }
